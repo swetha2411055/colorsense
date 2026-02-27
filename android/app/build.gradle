@@ -29,7 +29,7 @@ android {
 
     defaultConfig {
         applicationId 'com.example.colorsense'
-        minSdkVersion 24           // Camera2 + TFLite GPU require API 24+
+        minSdkVersion 26           // Camera2 + TFLite GPU require API 24+
         targetSdkVersion 34
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
