@@ -29,14 +29,14 @@ jobs:
 
       - name: Fix Android project files
         run: |
-          # Fix gradle.properties
+          # gradle.properties
           cat > android/gradle.properties << 'EOF'
           android.useAndroidX=true
           android.enableJetifier=true
           org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=512m
           EOF
 
-          # Fix gradle wrapper
+          # gradle wrapper
           mkdir -p android/gradle/wrapper
           cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
           distributionBase=GRADLE_USER_HOME
@@ -46,19 +46,114 @@ jobs:
           distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-all.zip
           EOF
 
-          # Fix settings.gradle - this is the missing file causing the error
+          # settings.gradle
           cat > android/settings.gradle << 'EOF'
           include ':app'
-
           def localPropertiesFile = new File(rootProject.projectDir, "local.properties")
           def properties = new Properties()
           assert localPropertiesFile.exists()
           localPropertiesFile.withReader("UTF-8") { reader -> properties.load(reader) }
-
           def flutterSdkPath = properties.getProperty("flutter.sdk")
           assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
           apply from: "$flutterSdkPath/packages/flutter_tools/gradle/app_plugin_loader.gradle"
           EOF
+
+      - name: Create missing Android resources
+        run: |
+          # Create res directories
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-xhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+          mkdir -p android/app/src/main/res/drawable
+          mkdir -p android/app/src/main/res/drawable-v21
+          mkdir -p android/app/src/main/res/values
+          mkdir -p android/app/src/main/res/values-night
+
+          # Create launcher icon using Flutter's default icon
+          FLUTTER_ICONS=$FLUTTER_ROOT/packages/flutter_tools/templates/app_shared/android.tmpl/app/src/main/res
+          if [ -d "$FLUTTER_ICONS" ]; then
+            cp -r $FLUTTER_ICONS/mipmap-* android/app/src/main/res/ 2>/dev/null || true
+          fi
+
+          # Generate a simple icon if Flutter template not found
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            if [ ! -f "android/app/src/main/res/mipmap-$density/ic_launcher.png" ]; then
+              # Copy from Flutter SDK default
+              find $FLUTTER_ROOT -name "ic_launcher.png" -path "*mipmap-$density*" 2>/dev/null | head -1 | xargs -I{} cp {} android/app/src/main/res/mipmap-$density/ 2>/dev/null || true
+            fi
+          done
+
+          # Create launch background drawable
+          cat > android/app/src/main/res/drawable/launch_background.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+              <item android:drawable="@android:color/white" />
+          </layer-list>
+          EOF
+
+          cat > android/app/src/main/res/drawable-v21/launch_background.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+              <item android:drawable="@android:color/white" />
+          </layer-list>
+          EOF
+
+          # Create styles.xml with LaunchTheme and NormalTheme
+          cat > android/app/src/main/res/values/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+                  <item name="android:windowBackground">@drawable/launch_background</item>
+              </style>
+              <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+                  <item name="android:windowBackground">@android:color/white</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > android/app/src/main/res/values-night/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+                  <item name="android:windowBackground">@drawable/launch_background</item>
+              </style>
+              <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+                  <item name="android:windowBackground">@android:color/black</item>
+              </style>
+          </resources>
+          EOF
+
+          # Create ic_launcher using Python if icons still missing
+          python3 - << 'PYEOF'
+          import os, struct, zlib
+
+          def create_png(width, height, color):
+              def chunk(name, data):
+                  c = zlib.crc32(name + data) & 0xffffffff
+                  return struct.pack('>I', len(data)) + name + data + struct.pack('>I', c)
+              sig = b'\x89PNG\r\n\x1a\n'
+              ihdr = chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0))
+              raw = b''
+              for y in range(height):
+                  raw += b'\x00'
+                  for x in range(width):
+                      raw += bytes(color)
+              idat = chunk(b'IDAT', zlib.compress(raw))
+              iend = chunk(b'IEND', b'')
+              return sig + ihdr + idat + iend
+
+          sizes = {'mdpi':48,'hdpi':72,'xhdpi':96,'xxhdpi':144,'xxxhdpi':192}
+          color = [100, 181, 246]  # light blue
+          for density, size in sizes.items():
+              path = f'android/app/src/main/res/mipmap-{density}/ic_launcher.png'
+              if not os.path.exists(path):
+                  os.makedirs(os.path.dirname(path), exist_ok=True)
+                  with open(path, 'wb') as f:
+                      f.write(create_png(size, size, color))
+                  print(f'Created {path}')
+          PYEOF
 
       - name: Install dependencies
         run: flutter pub get
