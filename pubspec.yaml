@@ -1,0 +1,54 @@
+name: colorsense
+description: ColorSense — AI Color Detection App for Colorblind Users
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.1.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # ── Camera & Image ──────────────────────────────────────────────────────────
+  camera: ^0.10.5+5
+  image_picker: ^1.0.7
+  image: ^4.1.7
+
+  # ── ML / TFLite ─────────────────────────────────────────────────────────────
+  tflite_flutter: ^0.10.4
+
+  # ── Voice Assistance ────────────────────────────────────────────────────────
+  flutter_tts: ^3.8.5
+
+  # ── Vibration ───────────────────────────────────────────────────────────────
+  vibration: ^1.8.4
+
+  # ── Networking (Chatbot) ────────────────────────────────────────────────────
+  http: ^1.2.0
+
+  # ── Local Persistence ───────────────────────────────────────────────────────
+  shared_preferences: ^2.2.2
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # ── State Management ────────────────────────────────────────────────────────
+  provider: ^6.1.1
+
+  # ── UI ──────────────────────────────────────────────────────────────────────
+  google_fonts: 6.2.0
+  permission_handler: ^11.2.0
+  path_provider: ^2.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.2
+  build_runner: ^2.4.8
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/models/
+    - assets/data/
