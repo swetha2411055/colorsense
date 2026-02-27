@@ -27,11 +27,38 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Enable AndroidX and fix Gradle
+      - name: Fix Android project files
         run: |
+          # Fix gradle.properties
+          cat > android/gradle.properties << 'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=512m
+          EOF
+
+          # Fix gradle wrapper
           mkdir -p android/gradle/wrapper
-          printf 'android.useAndroidX=true\nandroid.enableJetifier=true\norg.gradle.jvmargs=-Xmx4G\n' > android/gradle.properties
-          printf 'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-8.4-all.zip\n' > android/gradle/wrapper/gradle-wrapper.properties
+          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-all.zip
+          EOF
+
+          # Fix settings.gradle - this is the missing file causing the error
+          cat > android/settings.gradle << 'EOF'
+          include ':app'
+
+          def localPropertiesFile = new File(rootProject.projectDir, "local.properties")
+          def properties = new Properties()
+          assert localPropertiesFile.exists()
+          localPropertiesFile.withReader("UTF-8") { reader -> properties.load(reader) }
+
+          def flutterSdkPath = properties.getProperty("flutter.sdk")
+          assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+          apply from: "$flutterSdkPath/packages/flutter_tools/gradle/app_plugin_loader.gradle"
+          EOF
 
       - name: Install dependencies
         run: flutter pub get
